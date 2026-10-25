@@ -67,11 +67,12 @@ def render_duckdb_sandbox(db_manager: DuckDBManager):
                 "Number of Synthetic Flight Records to Ingest:",
                 options=[100000, 250000, 500000, 1000000],
                 value=250000,
-                format_func=lambda x: f"{x:,} flight logs"
+                format_func=lambda x: f"{x:,} flight logs",
+                key="sandbox_stress_slider"
             )
         with bcol2:
             st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-            if st.button("Generate Big Data", use_container_width=True, type="primary"):
+            if st.button("Generate Big Data", use_container_width=True, type="primary", key="sandbox_gen_btn"):
                 with st.spinner(f"Vectorizing {records_choice:,} flight logs in DuckDB..."):
                     count, duration = db_manager.generate_big_data_flight_archive(records_choice)
                     rate = count / duration if duration > 0 else 0
@@ -80,27 +81,40 @@ def render_duckdb_sandbox(db_manager: DuckDBManager):
 
         with bcol3:
             st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-            if st.button("Truncate Flight Table", use_container_width=True):
+            if st.button("Truncate Flight Table", use_container_width=True, key="sandbox_trunc_btn"):
                 db_manager.clear_database()
                 st.warning("Flight tables reset.")
                 st.rerun()
 
     # Section B: Interactive SQL Query Console
+    preset_options = list(PRESET_FLIGHT_QUERIES.keys())
+    
+    if "sandbox_active_preset" not in st.session_state:
+        st.session_state["sandbox_active_preset"] = preset_options[0]
+        st.session_state["sandbox_sql_text"] = PRESET_FLIGHT_QUERIES[preset_options[0]].strip()
+
+    def on_preset_change():
+        chosen = st.session_state.get("sandbox_preset_select", preset_options[0])
+        st.session_state["sandbox_active_preset"] = chosen
+        st.session_state["sandbox_sql_text"] = PRESET_FLIGHT_QUERIES[chosen].strip()
+
     selected_preset = st.selectbox(
         "Load Flight Query Preset:",
-        options=list(PRESET_FLIGHT_QUERIES.keys()),
-        index=0
+        options=preset_options,
+        index=preset_options.index(st.session_state["sandbox_active_preset"]) if st.session_state["sandbox_active_preset"] in preset_options else 0,
+        key="sandbox_preset_select",
+        on_change=on_preset_change
     )
 
     query_input = st.text_area(
         "SQL Query (DuckDB dialect):",
-        value=PRESET_FLIGHT_QUERIES[selected_preset].strip(),
-        height=140
+        height=140,
+        key="sandbox_sql_text"
     )
 
     rcol1, rcol2 = st.columns([1, 4])
     with rcol1:
-        run_pressed = st.button("▶ Run SQL Query", type="primary", use_container_width=True)
+        run_pressed = st.button("▶ Run SQL Query", type="primary", use_container_width=True, key="sandbox_run_btn")
 
     if run_pressed or query_input:
         df_result, duration_ms, error = db_manager.execute_custom_sql(query_input)

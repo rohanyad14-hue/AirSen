@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 
+STATIC_REGIONS = ["All Continents", "Africa", "Asia", "Europe", "Middle East", "North America", "Oceania", "South America"]
+
 def render_airport_weather_matrix(weather_df: pd.DataFrame):
     """Renders real-time airport hub weather, surface winds, and ground-stop alert matrix."""
     st.markdown("### 🌐 Global Hub Atmospheric Conditions & Ground Stop Risk")
@@ -10,9 +12,7 @@ def render_airport_weather_matrix(weather_df: pd.DataFrame):
         st.info("Awaiting airport meteorological updates...")
         return
 
-    # Filter by continent/region
-    regions = ["All Continents"] + sorted(list(weather_df['region'].unique())) if 'region' in weather_df.columns else ["All Continents"]
-    selected_region = st.selectbox("Filter Hubs by Region:", options=regions, index=0)
+    selected_region = st.selectbox("Filter Hubs by Region:", options=STATIC_REGIONS, index=0, key="weather_matrix_region_select")
 
     display_df = weather_df.copy()
     if selected_region != "All Continents" and 'region' in display_df.columns:

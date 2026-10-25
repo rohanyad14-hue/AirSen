@@ -2,7 +2,7 @@ import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
 import hashlib
-from backend.stream_generator import GLOBAL_AIRPORTS
+from backend.stream_generator import GLOBAL_AIRPORTS, GLOBAL_AIRLINES
 
 # Atmospheric Weather Pattern Definitions for Map Overlays
 JET_STREAM_CORRIDORS = [
@@ -36,6 +36,22 @@ FOG_RESTRICTIONS = [
     {'name': 'Persian Gulf Radiation Fog Belt', 'lons': [49.0, 56.0, 56.5, 49.5, 49.0], 'lats': [24.5, 25.5, 27.0, 26.0, 24.5]}
 ]
 
+# Pre-formatted static option lists to eliminate format_func double-formatting crashes
+AIRPORT_DISPLAY_LIST = [f"{code} - {meta['name']} ({meta['country']})" for code, meta in sorted(GLOBAL_AIRPORTS.items())]
+STATIC_ORIGINS = ["All Origins"] + AIRPORT_DISPLAY_LIST
+STATIC_DESTS = ["All Destinations"] + AIRPORT_DISPLAY_LIST
+STATIC_AIRLINES = ["All Airlines"] + sorted(list(GLOBAL_AIRLINES.keys()))
+STATIC_SECTORS = ["All Continents (Global)", "Asia & Middle East", "Europe", "North America", "South America", "Africa", "Oceania"]
+STATIC_DELAYS = ["All Flights", "On-Time (≤15m)", "Moderate Delay (15-45m)", "Severe Delay (>45m)"]
+STATIC_OVERLAYS = [
+    "None (Clean Radar)",
+    "🌀 Global Jet Streams (High-Altitude Winds)",
+    "⛈ Convective Storm Radar (Doppler dBZ)",
+    "⚠️ Clear-Air Turbulence (CAT) & Icing Zones",
+    "🌫️ Low Visibility & Marine Fog Layers"
+]
+STATIC_PROJECTIONS = ["Natural Earth", "Orthographic (3D Globe)", "Equirectangular", "Mercator"]
+
 def get_flight_position(flight_id: str, orig: str, dest: str, status: str):
     """Calculates deterministic en-route coordinates for an active flight."""
     c_orig = GLOBAL_AIRPORTS.get(orig, {'lat': 25.0, 'lon': 55.0})
@@ -56,6 +72,13 @@ def get_flight_position(flight_id: str, orig: str, dest: str, status: str):
     lon = c_orig['lon'] + progress * (c_dest['lon'] - c_orig['lon'])
     return lat, lon
 
+def format_airport_label(code: str) -> str:
+    """Formats airport code into a clear, readable string."""
+    if not code or code in ["All Origins", "All Destinations"]:
+        return str(code)
+    meta = GLOBAL_AIRPORTS.get(code, {})
+    return f"{code} - {meta.get('name', code)} ({meta.get('country', '')})"
+
 def render_flight_world_map(recent_flights: pd.DataFrame, weather_df: pd.DataFrame):
     """
     Renders the Flightradar24-scale Global Radar Map with active aircraft,
@@ -64,57 +87,43 @@ def render_flight_world_map(recent_flights: pd.DataFrame, weather_df: pd.DataFra
     st.markdown("### 🗺️ Global Flight Radar & Meteorological Threat Map")
     st.caption("Live geographical visualization of worldwide air traffic with selectable atmospheric weather overlays and route filters.")
 
-    if recent_flights.empty:
+    if recent_flights is None or recent_flights.empty:
         st.info("Awaiting flight telemetry stream to populate world map...")
         return
 
-    # Available airport choices for dropdowns
-    available_origins = ["All Origins"] + sorted(list(recent_flights['origin'].unique()))
-    available_dests = ["All Destinations"] + sorted(list(recent_flights['destination'].unique()))
-    available_airlines = ["All Airlines"] + sorted(list(recent_flights['airline'].unique()))
-
-    # Helper function to format airport labels with city
-    def format_airport_label(code: str) -> str:
-        if code in ["All Origins", "All Destinations"]:
-            return code
-        meta = GLOBAL_AIRPORTS.get(code, {})
-        return f"{code} - {meta.get('name', code)} ({meta.get('country', '')})"
-
-    # 1. Primary Filter Bar: Location, Destination, Airline & Delay
+    # 1. Primary Filter Bar: Origin, Destination, Airline & Delay
     f_row1_c1, f_row1_c2, f_row1_c3, f_row1_c4 = st.columns(4)
 
     with f_row1_c1:
         origin_choice = st.selectbox(
             "🛫 Origin Airport:",
-            options=available_origins,
+            options=STATIC_ORIGINS,
             index=0,
-            format_func=format_airport_label,
-            key="map_filter_origin"
+            key="map_filter_origin_stable"
         )
 
     with f_row1_c2:
         dest_choice = st.selectbox(
             "🛬 Destination Airport:",
-            options=available_dests,
+            options=STATIC_DESTS,
             index=0,
-            format_func=format_airport_label,
-            key="map_filter_destination"
+            key="map_filter_dest_stable"
         )
 
     with f_row1_c3:
         airline_choice = st.selectbox(
             "✈️ Airline / Carrier:",
-            options=available_airlines,
+            options=STATIC_AIRLINES,
             index=0,
-            key="map_filter_airline"
+            key="map_filter_airline_stable"
         )
 
     with f_row1_c4:
         delay_choice = st.selectbox(
             "⏱️ Delay Status:",
-            options=["All Flights", "On-Time (≤15m)", "Moderate Delay (15-45m)", "Severe Delay (>45m)"],
+            options=STATIC_DELAYS,
             index=0,
-            key="map_filter_delay"
+            key="map_filter_delay_stable"
         )
 
     # 2. Secondary Filter Bar: Weather Overlays, Continent & Projection
@@ -123,50 +132,47 @@ def render_flight_world_map(recent_flights: pd.DataFrame, weather_df: pd.DataFra
     with f_row2_c1:
         weather_overlay = st.selectbox(
             "🌦️ Selectable Weather Overlay:",
-            options=[
-                "None (Clean Radar)",
-                "🌀 Global Jet Streams (High-Altitude Winds)",
-                "⛈ Convective Storm Radar (Doppler dBZ)",
-                "⚠️ Clear-Air Turbulence (CAT) & Icing Zones",
-                "🌫️ Low Visibility & Marine Fog Layers"
-            ],
+            options=STATIC_OVERLAYS,
             index=1,
-            key="map_weather_pattern_select"
+            key="map_weather_overlay_stable"
         )
 
     with f_row2_c2:
         continent_choice = st.selectbox(
             "🌍 Airspace Sector / Region:",
-            options=["All Continents (Global)", "Asia & Middle East", "Europe", "North America", "South America", "Africa", "Oceania"],
+            options=STATIC_SECTORS,
             index=0,
-            key="map_filter_continent"
+            key="map_sector_stable"
         )
 
     with f_row2_c3:
         projection_choice = st.selectbox(
             "🌐 Map Projection:",
-            options=["natural earth", "orthographic", "equirectangular", "mercator"],
+            options=STATIC_PROJECTIONS,
             index=0,
-            format_func=lambda x: f"Projection: {x.title()}",
-            key="map_filter_projection"
+            key="map_projection_stable"
         )
 
     with f_row2_c4:
         st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
         t1, t2 = st.columns(2)
         with t1:
-            show_flight_paths = st.checkbox("Show Flight Paths", value=True, key="map_chk_paths")
+            show_flight_paths = st.checkbox("Show Flight Paths", value=True, key="map_paths_stable")
         with t2:
-            show_weather_hubs = st.checkbox("Airport Threat Rings", value=True, key="map_chk_hubs")
+            show_weather_hubs = st.checkbox("Airport Threat Rings", value=True, key="map_hubs_stable")
 
     # 3. Apply Filters Safely
     filtered_df = recent_flights.copy()
 
-    if origin_choice != "All Origins":
-        filtered_df = filtered_df[filtered_df['origin'] == origin_choice]
+    # Extract 3-letter IATA codes from formatted strings
+    orig_code = origin_choice.split(" - ")[0] if " - " in origin_choice else origin_choice
+    dest_code = dest_choice.split(" - ")[0] if " - " in dest_choice else dest_choice
 
-    if dest_choice != "All Destinations":
-        filtered_df = filtered_df[filtered_df['destination'] == dest_choice]
+    if orig_code != "All Origins":
+        filtered_df = filtered_df[filtered_df['origin'] == orig_code]
+
+    if dest_code != "All Destinations":
+        filtered_df = filtered_df[filtered_df['destination'] == dest_code]
 
     if airline_choice != "All Airlines":
         filtered_df = filtered_df[filtered_df['airline'] == airline_choice]
@@ -261,7 +267,6 @@ def render_flight_world_map(recent_flights: pd.DataFrame, weather_df: pd.DataFra
 
     # --- LAYER A: Flight Path Lines (Great-Circle Arcs) ---
     if show_flight_paths and not filtered_df.empty:
-        # Cap path lines at 100 to ensure crisp rendering performance
         for _, row in filtered_df.head(100).iterrows():
             c_orig = GLOBAL_AIRPORTS.get(row['origin'])
             c_dest = GLOBAL_AIRPORTS.get(row['destination'])
@@ -280,7 +285,7 @@ def render_flight_world_map(recent_flights: pd.DataFrame, weather_df: pd.DataFra
                 ))
 
     # --- LAYER B: Airport Hub Weather & Congestion Threat Zones ---
-    if show_weather_hubs and not weather_df.empty:
+    if show_weather_hubs and weather_df is not None and not weather_df.empty:
         hub_lats, hub_lons, hub_texts, hub_sizes, hub_colors = [], [], [], [], []
         for _, w in weather_df.iterrows():
             code = w['airport_code']
@@ -371,8 +376,14 @@ def render_flight_world_map(recent_flights: pd.DataFrame, weather_df: pd.DataFra
         ))
 
     # 5. Map Styling & Projection
+    proj_map = {
+        "Natural Earth": "natural earth",
+        "Orthographic (3D Globe)": "orthographic",
+        "Equirectangular": "equirectangular",
+        "Mercator": "mercator"
+    }
     fig.update_geos(
-        projection_type=projection_choice,
+        projection_type=proj_map.get(projection_choice, "natural earth"),
         showland=True,
         landcolor='#0F172A',
         showocean=True,

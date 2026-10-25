@@ -10,8 +10,11 @@ An autonomous, real-time aviation analytics engine built to predict and explain 
 | :--- | :--- |
 | **Global Airspace Coverage** | **39 Major Hubs across all 6 continents**: Asia & Middle East (`DXB`, `SIN`, `HND`, `NRT`, `HKG`, `DEL`, `BOM`, `ICN`, `BKK`, `DOH`, `PVG`), Europe (`LHR`, `CDG`, `FRA`, `AMS`, `MAD`, `IST`, `FCO`, `ZRH`), North America (`JFK`, `LAX`, `ORD`, `ATL`, `DFW`, `SFO`, `YYZ`, `MEX`), South America (`GRU`, `EZE`, `BOG`, `SCL`), Africa (`JNB`, `CAI`, `NBO`, `ADD`, `LOS`), Oceania (`SYD`, `MEL`, `AKL`). |
 | **Premier International Airlines** | Emirates (`EK`), Qatar Airways (`QR`), Singapore Airlines (`SQ`), Air India (`AI`), Cathay Pacific (`CX`), ANA (`NH`), JAL (`JL`), Korean Air (`KE`), Turkish Airlines (`TK`), Lufthansa (`LH`), British Airways (`BA`), Air France (`AF`), Qantas (`QF`), LATAM (`LA`), Ethiopian (`ET`), Delta (`DL`), American (`AA`), United (`UA`), Air Canada (`AC`). |
-| **Flicker-Free UX (Zero-Blink)** | Isolated lightweight refresh fragments decouple the navigation tabs and interactive maps from background data streams. User interactions (dropdowns, sliders, 3D globe rotation) remain completely stable without jumping or blinking. |
-| **Interactive World Radar Map** | Great-circle flight paths, dynamic aircraft position vectors, and airport weather threat rings with continent, delay, and weather filters. |
+| **Flightradar24-Scale Density** | **1,200+ Active Simultaneous Commercial Aircraft** operating worldwide across 39 international hubs on all 6 continents with sub-millisecond DuckDB OLAP processing. |
+| **Origin & Destination Filters** | Isolate specific airport pairs (e.g., `JFK ➔ LHR`, `DXB ➔ SIN`, `HND ➔ SYD`) or filter by carrier and delay status. |
+| **Selectable Weather Overlays** | User-toggleable meteorological layers: **Global Jet Streams** (125-155 kts), **Convective Doppler Radar Cells** (45-56 dBZ), **CAT Turbulence SIGMETs**, and **Marine/Radiation Fog Layers**. |
+| **Rock-Solid Reactivity (Zero Blanking)** | Decoupled execution model ensures dropdown selections and filter adjustments never cause blank screens or React reconciliation crashes. |
+| **Interactive World Radar Map** | Great-circle flight paths, dynamic aircraft position vectors, and airport weather threat rings with 3D Globe, Natural Earth, and Mercator projections. |
 | **Non-LLM Delay Prediction AI** | Scikit-Learn `HistGradientBoostingRegressor` + deterministic aerodynamic/congestion rules calculate delay in minutes ($0$ to $120+$ min) and explain root causes. |
 | **Big Data Engine (DuckDB)** | Sub-millisecond queries on 1,000,000+ flight logs with synchronized, thread-safe connection pooling. |
 
@@ -29,11 +32,16 @@ Simply double-click:
 ## 🗺️ Key Features in the Dashboard
 
 ### 1. 🗺️ Global Flight Radar & Weather Map
-- Real-time commercial aircraft plotted geographically with color-coded delay status (🟢 On-Time, 🟡 Moderate, 🔴 Severe).
-- Filter by Continent (`🌍 All Continents`, `Asia & Middle East`, `Europe`, `North America`, `South America`, `Africa`, `Oceania`).
-- Filter by Delay Tier and Weather Severity (Storms, High Winds, Fog).
-- Map projection options: `Natural Earth`, `Orthographic (3D Globe)`, `Equirectangular`, `Mercator`.
-- Click **"🔄 Sync Radar Positions"** anytime for instant on-demand radar position advance without page flicker.
+- **Flightradar24 Fleet Scale**: Over 1,200 commercial aircraft plotted geographically with real-time color-coded delay status (🟢 On-Time, 🟡 Moderate Delay, 🔴 Severe Hazard).
+- **Origin & Destination Routing Filters**: Select any specific origin airport (e.g. `JFK`, `LHR`, `DXB`, `HND`, `SYD`) and destination airport (`All Destinations` or specific pairing).
+- **Selectable Atmospheric Weather Overlays**:
+  - `🌀 Global Jet Streams (High-Altitude Winds)`: High-velocity polar and subtropical jet stream cores (125-155 knots) at FL340-FL380.
+  - `⛈ Convective Storm Radar (Doppler dBZ)`: Severe thunderstorm supercells and squall lines with radar reflectivity up to 56 dBZ.
+  - `⚠️ Clear-Air Turbulence (CAT) & Icing Zones`: Mountain wave and high-shear SIGMET turbulence boundaries.
+  - `🌫️ Low Visibility & Marine Fog Layers`: Advection and radiation fog corridors enforcing ILS CAT III instrument approaches.
+  - `None (Clean Radar)`: Clean flight radar view.
+- **Airspace Sector Filtering**: Filter by Continent (`🌍 All Continents`, `Asia & Middle East`, `Europe`, `North America`, `South America`, `Africa`, `Oceania`).
+- **Map Projections**: `Natural Earth`, `Orthographic (3D Globe)`, `Equirectangular`, `Mercator`.
 
 ### 2. ✈️ Air Assistant & Flight Delay Inspector
 - Select any active international flight (e.g. `EK-412 DXB ➔ SYD`, `AI-101 DEL ➔ JFK`, `SQ-322 SIN ➔ LHR`).

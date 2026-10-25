@@ -40,11 +40,25 @@ class AutonomousOrchestrator:
         
         self._initialized = True
 
+    def seed_initial_if_needed(self):
+        """Ensures high-density global airspace is seeded immediately on startup."""
+        metrics = self.db.get_summary_metrics()
+        if metrics['total_records'] < 800:
+            initial_flights = self.generator.generate_high_density_global_airspace(target_count=1200)
+            delays, sevs, causes, confs = self.ai.predict_flight_delays(initial_flights)
+            initial_flights['predicted_delay_min'] = delays
+            initial_flights['delay_severity'] = sevs
+            initial_flights['primary_cause'] = causes
+            initial_flights['confidence_score'] = confs
+            self.db.insert_flights_batch(initial_flights)
+            self.db.update_airport_weather(self.generator.get_weather_df())
+
     def start(self):
         """Starts the autonomous background ingestion and scoring thread."""
         with self._lock:
             if self.is_running and self.thread and self.thread.is_alive():
                 return
+            self.seed_initial_if_needed()
             self.is_running = True
             self.thread = threading.Thread(target=self._run_loop, daemon=True)
             self.thread.start()
@@ -60,17 +74,7 @@ class AutonomousOrchestrator:
 
     def _run_loop(self):
         """Main autonomous execution cycle."""
-        # Seed Flightradar24-scale global airspace if empty
-        metrics = self.db.get_summary_metrics()
-        if metrics['total_records'] < 800:
-            initial_flights = self.generator.generate_high_density_global_airspace(target_count=1200)
-            delays, sevs, causes, confs = self.ai.predict_flight_delays(initial_flights)
-            initial_flights['predicted_delay_min'] = delays
-            initial_flights['delay_severity'] = sevs
-            initial_flights['primary_cause'] = causes
-            initial_flights['confidence_score'] = confs
-            self.db.insert_flights_batch(initial_flights)
-            self.db.update_airport_weather(self.generator.get_weather_df())
+        self.seed_initial_if_needed()
 
         while self.is_running:
             t0 = time.time()

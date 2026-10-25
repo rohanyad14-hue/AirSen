@@ -15,26 +15,35 @@ def render_air_assistant(recent_flights: pd.DataFrame, ai_engine: AirAssistantAI
         st.info("Awaiting live flight telemetry stream...")
         return
 
-    # Stable flight ID list to prevent dropdown selection crashes
-    flight_ids = list(recent_flights['flight_id'].unique()[:60])
-    flight_lookup = {r['flight_id']: r for _, r in recent_flights.iterrows()}
+    # Pre-formatted flight labels to eliminate format_func serialization crashes
+    # Note: Do NOT put volatile dynamic metrics (like changing delay numbers) into the dropdown option string,
+    # as that causes option list mismatches and ValueError on reruns.
+    display_options = []
+    flight_dict = {}
+    for _, r in recent_flights.head(100).iterrows():
+        fid = r['flight_id']
+        label = f"{fid} | {r['airline']} | {r['origin']} ➔ {r['destination']}"
+        if label not in flight_dict:
+            display_options.append(label)
+            flight_dict[label] = r.to_dict()
 
-    def format_flight_label(fid: str) -> str:
-        r = flight_lookup.get(fid)
-        if not r:
-            return fid
-        delay_tag = f"+{r['predicted_delay_min']:.0f}m" if r['predicted_delay_min'] > 0 else "On-Time"
-        return f"{fid} | {r['airline']} | {r['origin']} ➔ {r['destination']} ({delay_tag})"
+    # Ensure any previously selected flight remains in options to prevent Streamlit widget index mismatch
+    prev_sel = st.session_state.get("assistant_flight_picker_stable")
+    if prev_sel and prev_sel not in display_options:
+        display_options.insert(0, prev_sel)
 
-    selected_flight_id = st.selectbox(
+    if not display_options:
+        st.info("Awaiting live flight telemetry stream...")
+        return
+
+    selected_label = st.selectbox(
         "Select Flight to Inspect:",
-        options=flight_ids,
-        index=0 if flight_ids else None,
-        format_func=format_flight_label,
-        key="assistant_flight_picker"
+        options=display_options,
+        index=0,
+        key="assistant_flight_picker_stable"
     )
 
-    flight_row = flight_lookup.get(selected_flight_id, recent_flights.iloc[0].to_dict())
+    flight_row = flight_dict.get(selected_label, recent_flights.iloc[0].to_dict())
 
     # Generate AI explanation
     explanation = ai_engine.explain_single_flight(flight_row)
