@@ -1,0 +1,192 @@
+import os
+import sys
+
+# Ensure workspace root is in python path
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+import streamlit as st
+from backend.database import DuckDBManager
+from backend.autonomous_worker import AutonomousOrchestrator
+from backend.stream_generator import GLOBAL_AIRPORTS
+from frontend.styles import get_custom_css
+from frontend.components import (
+    render_kpi_cards,
+    render_air_assistant,
+    render_flight_world_map,
+    render_flight_radar_table,
+    render_delay_analytics_charts,
+    render_airport_weather_matrix,
+    render_duckdb_sandbox
+)
+
+# 1. Page Configuration
+st.set_page_config(
+    page_title="AeroSentinel // Global Air Assistant AI & Flight Radar",
+    page_icon="✈️",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# 2. Inject Custom CSS
+st.markdown(get_custom_css(), unsafe_allow_html=True)
+
+# 3. Singleton Database & Autonomous Worker Initialization
+@st.cache_resource
+def get_backend():
+    db = DuckDBManager()
+    worker = AutonomousOrchestrator()
+    worker.start()  # Autonomously stream & score flights on boot
+    return db, worker
+
+db_manager, orchestrator = get_backend()
+
+# 4. Sidebar Controls & Meteorological Simulator
+with st.sidebar:
+    st.markdown("### 🎛 Flight Radar Controls")
+    
+    status = orchestrator.get_status()
+    is_active = status['is_running']
+    
+    col_s1, col_s2 = st.columns(2)
+    with col_s1:
+        if is_active:
+            if st.button("⏸ Pause Feed", use_container_width=True, key="sb_pause_btn"):
+                orchestrator.stop()
+                st.rerun()
+        else:
+            if st.button("▶ Resume Feed", use_container_width=True, type="primary", key="sb_resume_btn"):
+                orchestrator.start()
+                st.rerun()
+    
+    with col_s2:
+        if st.button("🔄 Instant Sync", use_container_width=True, type="secondary", key="sb_sync_btn"):
+            st.rerun()
+
+    st.markdown("---")
+    st.markdown("#### ⚡ Flight Stream Volume")
+    new_batch_size = st.slider(
+        "Flights Ingested per Batch:",
+        min_value=20,
+        max_value=120,
+        value=status['batch_size'],
+        step=20,
+        key="sb_batch_size_slider"
+    )
+    if new_batch_size != status['batch_size']:
+        orchestrator.batch_size = new_batch_size
+
+    st.markdown("---")
+    st.markdown("#### ⛈ Extreme Weather Shock Injector")
+    st.caption("Trigger a typhoon, blizzard, or convective thunderstorm at any international hub to watch real-time AI delay cascades.")
+    
+    hub_options = sorted(list(GLOBAL_AIRPORTS.keys()))
+    default_idx = hub_options.index('ORD') if 'ORD' in hub_options else 0
+    target_hub = st.selectbox(
+        "Target Airport Hub:",
+        options=hub_options,
+        index=default_idx,
+        key="sb_shock_hub_select",
+        format_func=lambda h: f"{h} - {GLOBAL_AIRPORTS.get(h, {}).get('name', h)}"
+    )
+    
+    if st.button(f"⚡ Inject Storm Shock at {target_hub}", use_container_width=True, key="sb_shock_btn"):
+        orchestrator.trigger_hub_storm(hub=target_hub, duration_steps=25)
+        st.toast(f"⛈ Severe storm cell triggered at {target_hub}! Watch delay predictions spike.", icon="🚨")
+
+    st.markdown("---")
+    st.markdown("""
+    <div style="font-size: 11px; color: #64748B; font-family: 'JetBrains Mono', monospace;">
+        COVERAGE: Global (Americas, EU, Asia, ME, Africa, Oceania)<br>
+        FLEET DENSITY: Flightradar24 Scale (1,200+ Active Flights)<br>
+        ENGINE: DuckDB In-Process Columnar OLAP<br>
+        AI MODEL: HistGradientBoosting Trees (No LLM)<br>
+        STATUS: 100% Deterministic & Private
+    </div>
+    """, unsafe_allow_html=True)
+
+# 5. Top Header Banner
+worker_status = orchestrator.get_status()
+pulse_html = """<span class="badge-live"><span class="badge-pulse"></span> GLOBAL RADAR ACTIVE</span>""" if worker_status['is_running'] else """<span class="badge-live" style="background: rgba(245, 158, 11, 0.15); color: #F59E0B; border-color: rgba(245, 158, 11, 0.3);">PAUSED</span>"""
+
+st.markdown(f"""
+<div class="sentinel-header">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+        <div>
+            <div class="sentinel-title">
+                ✈️ AEROSENTINEL // Global Air Assistant AI & Flight Radar
+            </div>
+            <p class="sentinel-subtitle">
+                Worldwide Commercial Flight Telemetry • Atmospheric Weather Overlays • Non-LLM Gradient Boosted Delay Forecasting • DuckDB Big Data OLAP
+            </p>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            {pulse_html}
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #94A3B8; background: rgba(15, 23, 42, 0.6); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05);">
+                ⏱ {worker_status['last_cycle_latency_ms']} ms cycle
+            </span>
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# Fetch latest telemetry data safely
+try:
+    summary_metrics = db_manager.get_summary_metrics()
+    recent_flights = db_manager.get_recent_flights(limit=1500)  # Flightradar24 scale!
+    weather_df = db_manager.get_airport_weather_table()
+    airline_df = db_manager.get_airline_performance()
+    route_df = db_manager.get_route_delay_hotspots(limit=10)
+except Exception as e:
+    st.error(f"Error querying telemetry database: {e}")
+    summary_metrics = {}
+    recent_flights = pd.DataFrame()
+    weather_df = pd.DataFrame()
+    airline_df = pd.DataFrame()
+    route_df = pd.DataFrame()
+
+# 6. Executive Fleet KPI Banner
+render_kpi_cards(summary_metrics, worker_status)
+st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
+
+# 7. Main Navigation Tabs (Completely stable, zero-flicker, zero-blanking)
+tab_map, tab_assistant, tab_radar, tab_weather, tab_duckdb = st.tabs([
+    "🗺️ Global Flight Radar & Weather Map",
+    "✈️ Air Assistant & Flight Inspector",
+    "📡 Live Radar Feed & Analytics",
+    "🌐 Worldwide Hubs Weather Matrix",
+    "⚡ DuckDB Big Data Flight Sandbox"
+])
+
+with tab_map:
+    try:
+        render_flight_world_map(recent_flights, weather_df)
+    except Exception as e:
+        st.error(f"Error rendering Global Flight Map: {e}")
+
+with tab_assistant:
+    try:
+        render_air_assistant(recent_flights, orchestrator.ai)
+    except Exception as e:
+        st.error(f"Error rendering Air Assistant: {e}")
+
+with tab_radar:
+    try:
+        render_flight_radar_table(recent_flights)
+        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+        render_delay_analytics_charts(recent_flights, airline_df, route_df)
+    except Exception as e:
+        st.error(f"Error rendering Live Radar Feed: {e}")
+
+with tab_weather:
+    try:
+        render_airport_weather_matrix(weather_df)
+    except Exception as e:
+        st.error(f"Error rendering Weather Matrix: {e}")
+
+with tab_duckdb:
+    try:
+        render_duckdb_sandbox(db_manager)
+    except Exception as e:
+        st.error(f"Error rendering DuckDB Sandbox: {e}")
