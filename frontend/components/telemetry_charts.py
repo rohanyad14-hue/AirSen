@@ -36,21 +36,24 @@ def render_flight_radar_table(recent_df: pd.DataFrame):
 
     st.markdown("#### 📡 Live Global Air Traffic Radar Stream (Flightradar24 Scale)")
     
-    display_df = recent_df[[
-        'flight_id', 'airline', 'origin', 'destination', 'status',
-        'weather_condition', 'wind_speed_kts', 'congestion_index',
+    cols_to_use = [
+        'flight_id', 'airline', 'origin', 'destination', 'altitude_ft', 'speed_kts',
+        'status', 'weather_condition', 'wind_speed_kts',
         'predicted_delay_min', 'delay_severity', 'primary_cause'
-    ]].copy()
+    ]
+    avail_cols = [c for c in cols_to_use if c in recent_df.columns]
+    display_df = recent_df[avail_cols].copy()
 
     display_df.rename(columns={
         'flight_id': 'Flight',
         'airline': 'Airline',
         'origin': 'From',
         'destination': 'To',
+        'altitude_ft': 'Alt (ft)',
+        'speed_kts': 'Speed (kts)',
         'status': 'Status',
         'weather_condition': 'Weather',
         'wind_speed_kts': 'Wind (kts)',
-        'congestion_index': 'Congestion (%)',
         'predicted_delay_min': 'Est Delay (min)',
         'delay_severity': 'Severity',
         'primary_cause': 'Primary Delay Driver'

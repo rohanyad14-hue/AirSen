@@ -339,7 +339,17 @@ def render_flight_world_map(recent_flights: pd.DataFrame, weather_df: pd.DataFra
         plane_lats, plane_lons, plane_texts, plane_colors = [], [], [], []
         
         for _, row in filtered_df.iterrows():
-            lat, lon = get_flight_position(row['flight_id'], row['origin'], row['destination'], row['status'])
+            is_real_gps = (
+                'latitude' in row and pd.notnull(row['latitude']) and 
+                'longitude' in row and pd.notnull(row['longitude']) and 
+                (float(row['latitude']) != 0.0 or float(row['longitude']) != 0.0)
+            )
+
+            if is_real_gps:
+                lat, lon = float(row['latitude']), float(row['longitude'])
+            else:
+                lat, lon = get_flight_position(row['flight_id'], row['origin'], row['destination'], row['status'])
+                
             plane_lats.append(lat)
             plane_lons.append(lon)
             
@@ -349,12 +359,16 @@ def render_flight_world_map(recent_flights: pd.DataFrame, weather_df: pd.DataFra
 
             orig_info = GLOBAL_AIRPORTS.get(row['origin'], {})
             dest_info = GLOBAL_AIRPORTS.get(row['destination'], {})
+            origin_ctry = row.get('origin_country') or orig_info.get('country', '')
+
+            badge = "🛰️ REAL ADS-B (OpenSky)" if is_real_gps else "✈️ SIMULATED"
 
             plane_texts.append(
-                f"<b>✈️ {row['flight_id']} // {row['airline']}</b><br>"
-                f"Route: {row['origin']} ({orig_info.get('country', '')}) ➔ {row['destination']} ({dest_info.get('country', '')})<br>"
-                f"Distance: {row['distance_miles']:,.0f} mi<br>"
-                f"Status: {row['status']} | Alt: {row['altitude_ft']:,} ft | Spd: {row['speed_kts']} kts<br>"
+                f"<b>{badge} // {row['flight_id']}</b><br>"
+                f"Carrier: <b>{row['airline']}</b> ({origin_ctry})<br>"
+                f"Position: {lat:.2f}°, {lon:.2f}° | Status: {row['status']}<br>"
+                f"Route: {row['origin']} ➔ {row['destination']} ({row['distance_miles']:,.0f} mi)<br>"
+                f"Alt: {row['altitude_ft']:,} ft | Spd: {row['speed_kts']} kts<br>"
                 f"Dest Weather: {row['weather_condition']} ({row['wind_speed_kts']:.0f} kts wind)<br>"
                 f"<b>Predicted Delay: +{delay:.0f} min ({row['delay_severity']})</b><br>"
                 f"Primary Driver: {row['primary_cause']}"

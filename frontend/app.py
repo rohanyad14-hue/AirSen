@@ -68,6 +68,40 @@ def main():
                 st.rerun()
 
         st.markdown("---")
+        st.markdown("#### 🛰️ Radar Data Stream")
+        source_mode_options = [
+            "🛰️ Live OpenSky API (Real-World ADS-B)",
+            "📡 Synthetic Simulator (High-Density Airspace)"
+        ]
+        curr_mode_idx = 0 if status.get('mode') == 'opensky' else 1
+        selected_source = st.selectbox(
+            "Telemetry Stream Mode:",
+            options=source_mode_options,
+            index=curr_mode_idx,
+            key="sb_data_source_mode"
+        )
+        target_mode = "opensky" if "OpenSky" in selected_source else "synthetic"
+        if target_mode != status.get('mode'):
+            orchestrator.set_data_mode(target_mode)
+            st.rerun()
+
+        if target_mode == "opensky":
+            live_count = status.get('opensky_last_count', 0)
+            client_id = status.get('opensky_client_id', 'vittestuser1-api-client')
+            st.markdown(f"""
+            <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px;">
+                <div style="font-size: 11px; font-weight: 700; color: #10B981; letter-spacing: 0.5px;">🟢 OPENSKY NETWORK CONNECTED</div>
+                <div style="font-size: 11px; color: #94A3B8; font-family: monospace; margin-top: 3px;">Client: <b>{client_id}</b></div>
+                <div style="font-size: 11px; color: #38BDF8; font-family: monospace; margin-top: 2px;">Global Live Aircraft: <b>{live_count:,}</b></div>
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button("📥 Pull Real OpenSky Fleet (400 Planes)", use_container_width=True, key="sb_pull_opensky_btn"):
+                with st.spinner("Fetching live ADS-B telemetry from OpenSky Network..."):
+                    added = orchestrator.ingest_live_opensky_snapshot(limit=400)
+                    st.toast(f"Ingested {added} live airborne flights from OpenSky Network!", icon="🛰️")
+                    st.rerun()
+
+        st.markdown("---")
         st.markdown("#### ⚡ Flight Stream Volume")
         new_batch_size = st.slider(
             "Flights Ingested per Batch:",
@@ -102,6 +136,7 @@ def main():
         st.markdown("---")
         st.markdown("""
         <div style="font-size: 11px; color: #64748B; font-family: 'JetBrains Mono', monospace;">
+            DATA FEED: OpenSky Network ADS-B OAuth2 API<br>
             COVERAGE: Global (Americas, EU, Asia, ME, Africa, Oceania)<br>
             FLEET DENSITY: Flightradar24 Scale (1,200+ Active Flights)<br>
             ENGINE: DuckDB In-Process Columnar OLAP<br>
@@ -113,6 +148,8 @@ def main():
     # 5. Top Header Banner
     worker_status = orchestrator.get_status()
     pulse_html = """<span class="badge-live"><span class="badge-pulse"></span> GLOBAL RADAR ACTIVE</span>""" if worker_status['is_running'] else """<span class="badge-live" style="background: rgba(245, 158, 11, 0.15); color: #F59E0B; border-color: rgba(245, 158, 11, 0.3);">PAUSED</span>"""
+    
+    feed_badge = """<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #10B981; background: rgba(16, 185, 129, 0.12); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.3);">🛰️ OPENSKY LIVE API</span>""" if worker_status.get('mode') == 'opensky' else """<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #38BDF8; background: rgba(56, 189, 248, 0.12); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(56, 189, 248, 0.3);">📡 SIMULATOR</span>"""
 
     st.markdown(f"""
     <div class="sentinel-header">
@@ -125,7 +162,8 @@ def main():
                     Worldwide Commercial Flight Telemetry • Atmospheric Weather Overlays • Non-LLM Gradient Boosted Delay Forecasting • DuckDB Big Data OLAP
                 </p>
             </div>
-            <div style="display: flex; gap: 10px; align-items: center;">
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                {feed_badge}
                 {pulse_html}
                 <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #94A3B8; background: rgba(15, 23, 42, 0.6); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05);">
                     ⏱ {worker_status['last_cycle_latency_ms']} ms cycle

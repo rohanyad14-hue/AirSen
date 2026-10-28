@@ -11,10 +11,11 @@ An autonomous, real-time aviation analytics engine built to predict and explain 
 | **Global Airspace Coverage** | **39 Major Hubs across all 6 continents**: Asia & Middle East (`DXB`, `SIN`, `HND`, `NRT`, `HKG`, `DEL`, `BOM`, `ICN`, `BKK`, `DOH`, `PVG`), Europe (`LHR`, `CDG`, `FRA`, `AMS`, `MAD`, `IST`, `FCO`, `ZRH`), North America (`JFK`, `LAX`, `ORD`, `ATL`, `DFW`, `SFO`, `YYZ`, `MEX`), South America (`GRU`, `EZE`, `BOG`, `SCL`), Africa (`JNB`, `CAI`, `NBO`, `ADD`, `LOS`), Oceania (`SYD`, `MEL`, `AKL`). |
 | **Premier International Airlines** | Emirates (`EK`), Qatar Airways (`QR`), Singapore Airlines (`SQ`), Air India (`AI`), Cathay Pacific (`CX`), ANA (`NH`), JAL (`JL`), Korean Air (`KE`), Turkish Airlines (`TK`), Lufthansa (`LH`), British Airways (`BA`), Air France (`AF`), Qantas (`QF`), LATAM (`LA`), Ethiopian (`ET`), Delta (`DL`), American (`AA`), United (`UA`), Air Canada (`AC`). |
 | **Flightradar24-Scale Density** | **1,200+ Active Simultaneous Commercial Aircraft** operating worldwide across 39 international hubs on all 6 continents with sub-millisecond DuckDB OLAP processing. |
+| **Live OpenSky ADS-B Ingestion** | **Authenticated OAuth2 Live Stream**: Pulls real-world airborne flights worldwide via OpenSky Network REST API with real ADS-B coordinates, altitudes, ground speeds, and callsigns. |
 | **Origin & Destination Filters** | Isolate specific airport pairs (e.g., `JFK ➔ LHR`, `DXB ➔ SIN`, `HND ➔ SYD`) or filter by carrier and delay status. |
 | **Selectable Weather Overlays** | User-toggleable meteorological layers: **Global Jet Streams** (125-155 kts), **Convective Doppler Radar Cells** (45-56 dBZ), **CAT Turbulence SIGMETs**, and **Marine/Radiation Fog Layers**. |
-| **Rock-Solid Reactivity (Zero Blanking)** | Decoupled execution model ensures dropdown selections and filter adjustments never cause blank screens or React reconciliation crashes. |
-| **Interactive World Radar Map** | Great-circle flight paths, dynamic aircraft position vectors, and airport weather threat rings with 3D Globe, Natural Earth, and Mercator projections. |
+| **Dual Telemetry Modes** | Seamlessly toggle between **Live OpenSky API** (real airborne flights) and **Synthetic Simulator** (1,200+ hub aircraft). |
+| **Interactive World Radar Map** | Great-circle flight paths, exact real ADS-B coordinates, and airport weather threat rings with 3D Globe, Natural Earth, and Mercator projections. |
 | **Non-LLM Delay Prediction AI** | Scikit-Learn `HistGradientBoostingRegressor` + deterministic aerodynamic/congestion rules calculate delay in minutes ($0$ to $120+$ min) and explain root causes. |
 | **Big Data Engine (DuckDB)** | Sub-millisecond queries on 1,000,000+ flight logs with synchronized, thread-safe connection pooling. |
 

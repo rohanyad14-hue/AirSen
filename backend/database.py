@@ -62,7 +62,10 @@ class DuckDBManager:
                     predicted_delay_min DOUBLE DEFAULT 0.0,
                     delay_severity VARCHAR DEFAULT 'On-Time (0-15m)',
                     primary_cause VARCHAR DEFAULT 'Normal Flow',
-                    confidence_score DOUBLE DEFAULT 0.95
+                    confidence_score DOUBLE DEFAULT 0.95,
+                    latitude DOUBLE,
+                    longitude DOUBLE,
+                    origin_country VARCHAR
                 );
 
                 CREATE TABLE IF NOT EXISTS airport_weather (
@@ -79,6 +82,15 @@ class DuckDBManager:
                     updated_at TIMESTAMP
                 );
             """)
+
+            # Ensure schema backward compatibility for flights_stream
+            f_cols = [r[0] for r in self.con.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'flights_stream'").fetchall()]
+            if 'latitude' not in f_cols:
+                self.con.execute("ALTER TABLE flights_stream ADD COLUMN latitude DOUBLE;")
+            if 'longitude' not in f_cols:
+                self.con.execute("ALTER TABLE flights_stream ADD COLUMN longitude DOUBLE;")
+            if 'origin_country' not in f_cols:
+                self.con.execute("ALTER TABLE flights_stream ADD COLUMN origin_country VARCHAR;")
 
             # Ensure clean schema alignment for airport_weather
             cols = [r[0] for r in self.con.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'airport_weather'").fetchall()]
@@ -105,14 +117,21 @@ class DuckDBManager:
         if df.empty:
             return 0
         with self.lock:
-            self.con.register("df_flight_batch", df)
+            # Ensure optional GPS and metadata columns exist in DataFrame
+            df_to_insert = df.copy()
+            for col in ['latitude', 'longitude', 'origin_country']:
+                if col not in df_to_insert.columns:
+                    df_to_insert[col] = None
+
+            self.con.register("df_flight_batch", df_to_insert)
             self.con.execute("""
                 INSERT INTO flights_stream (
                     id, timestamp, flight_id, airline, origin, destination,
                     scheduled_dep_hour, distance_miles, altitude_ft, speed_kts,
                     status, weather_condition, wind_speed_kts, visibility_miles,
                     precipitation_mm, congestion_index, predicted_delay_min,
-                    delay_severity, primary_cause, confidence_score
+                    delay_severity, primary_cause, confidence_score,
+                    latitude, longitude, origin_country
                 )
                 SELECT 
                     nextval('flight_seq'),
@@ -120,11 +139,12 @@ class DuckDBManager:
                     scheduled_dep_hour, distance_miles, altitude_ft, speed_kts,
                     status, weather_condition, wind_speed_kts, visibility_miles,
                     precipitation_mm, congestion_index, predicted_delay_min,
-                    delay_severity, primary_cause, confidence_score
+                    delay_severity, primary_cause, confidence_score,
+                    latitude, longitude, origin_country
                 FROM df_flight_batch
             """)
             self.con.unregister("df_flight_batch")
-            return len(df)
+            return len(df_to_insert)
 
     def update_airport_weather(self, weather_df: pd.DataFrame):
         """Updates real-time airport ground conditions and congestion indices."""
